@@ -1,0 +1,65 @@
+name: Build App
+
+on:
+  push:
+    tags:
+      - 'rt*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 16
+      - name: Install deps
+        run: npm install
+      - name: Build Electron (Windows 11+)
+        run: npm run build:win
+      - name: Package .aAPP (Windows)
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          New-Item -ItemType Directory -Force -Path out
+          # tar the whole folder, preserve structure, rename to .aAPP
+          tar -czf "out/JOHAG-${tag}-win.aAPP" -C dist/win .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: johag-win
+          path: out/*.aAPP
+
+  build-mac:
+    runs-on: macos-11
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 16
+      - name: Install deps
+        run: npm install
+      - name: Build Electron (macOS 10.11+ / Electron 10)
+        run: npm run build:mac
+      - name: Package .aAPP (macOS)
+        run: |
+          TAG="${{ github.ref_name }}"
+          mkdir -p out
+          tar -czf "out/JOHAG-${TAG}-mac.aAPP" -C dist/mac .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: johag-mac
+          path: out/*.aAPP
+
+  release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.aAPP
+          tag_name: ${{ github.ref_name }}
