@@ -1,0 +1,41 @@
+name: JVUpdater
+
+on:
+  push:
+    tags:
+      - 'rt*'
+
+jobs:
+  publish-manifest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Generate version.json
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#rt}"
+          GT=$(git tag --points-at HEAD | grep '^gt' | head -n1 || echo "gtNone")
+          cat > version.json <<EOF
+          {
+            "latest_tag": "$TAG",
+            "version": "$VERSION",
+            "game_type": "$GT",
+            "win_min": "11",
+            "mac_min": "10.11",
+            "win_url": "https://github.com/${{ github.repository }}/releases/download/$TAG/JOHAG-${TAG}-win.aAPP",
+            "mac_url": "https://github.com/${{ github.repository }}/releases/download/$TAG/JOHAG-${TAG}-mac.aAPP"
+          }
+          EOF
+
+      - name: Commit version.json
+        run: |
+          git config user.name "jvupdater-bot"
+          git config user.email "bot@jangova.dev"
+          git add version.json
+          git commit -m "JVUpdater: $GITHUB_REF_NAME" || echo "no changes"
+          git push
